@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Footer from "@/components/Footer";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Playfair_Display, DM_Sans } from "next/font/google";
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   <Navbar />
 </Suspense>
             {children}
+            <Footer />
             </body>
     </html>
   );
