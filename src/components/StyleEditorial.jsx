@@ -22,9 +22,9 @@ export default function StyleEditorial() {
 
         <div className="grid gap-8 md:grid-cols-12 md:gap-5">
           <div className="group md:col-span-5">
-            <div className="relative h-[360px] overflow-hidden md:h-[470px]">
+            <div className="relative h-90 overflow-hidden md:h-117.5">
               <Image
-                src="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1000&q=85"
+              src="/images/style.avif"
                 alt="Contemporary everyday fashion"
                 fill
                 sizes="(max-width: 768px) 100vw, 42vw"
@@ -48,9 +48,9 @@ export default function StyleEditorial() {
           </div>
 
           <div className="md:col-span-2 md:pt-20">
-            <div className="relative h-[260px] overflow-hidden md:h-[300px]">
+            <div className="relative h-65 overflow-hidden md:h-75">
               <Image
-                src="https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?auto=format&fit=crop&w=700&q=85"
+                src="/images/style1.avif"
                 alt="Minimal neutral fashion outfit"
                 fill
                 sizes="(max-width: 768px) 100vw, 17vw"
@@ -80,7 +80,7 @@ export default function StyleEditorial() {
               FIND YOUR STYLE ↗
             </Link>
 
-            <div className="relative mt-10 h-[200px] overflow-hidden md:ml-16 md:h-[230px]">
+            <div className="relative mt-10 h-50 overflow-hidden md:ml-16 md:h-57.5">
               <Image
                 src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=900&q=85"
                 alt="Fashion wardrobe inspiration"
