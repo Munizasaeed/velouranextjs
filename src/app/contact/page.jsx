@@ -1,4 +1,46 @@
+"use client";
+import { useState } from "react";
 export default function ContactPage() {
+  
+const [status, setStatus] = useState("idle");
+
+async function handleSubmit(event) {
+  event.preventDefault();
+  setStatus("loading");
+
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+
+  const data = {
+    name: formData.get("name"),
+    email: formData.get("email"),
+    subject: formData.get("subject"),
+    message: formData.get("message"),
+  };
+
+  try {
+    const response = await fetch("/api/contact", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Something went wrong.");
+    }
+
+    setStatus("success");
+    form.reset();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (error) {
+    setStatus("error");
+  }
+}
+
   return (
     <main className="bg-[#faf8f5] text-neutral-900">
       {/* Hero */}
@@ -83,7 +125,7 @@ export default function ContactPage() {
             Fill out the form below and we’ll get back to you.
           </p>
 
-          <form className="mt-8 space-y-6">
+          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             <div>
               <label
                 htmlFor="name"
@@ -95,6 +137,7 @@ export default function ContactPage() {
                 id="name"
                 name="name"
                 type="text"
+                  required
                 placeholder="Your name"
                 className="w-full border-b border-neutral-300 bg-transparent px-0 py-3 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-900"
               />
@@ -111,6 +154,7 @@ export default function ContactPage() {
                 id="email"
                 name="email"
                 type="email"
+                  required
                 placeholder="you@example.com"
                 className="w-full border-b border-neutral-300 bg-transparent px-0 py-3 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-900"
               />
@@ -127,6 +171,7 @@ export default function ContactPage() {
                 id="subject"
                 name="subject"
                 defaultValue=""
+                  required
                 className="w-full border-b border-neutral-300 bg-transparent px-0 py-3 text-sm outline-none focus:border-neutral-900"
               >
                 <option value="" disabled>
@@ -149,18 +194,31 @@ export default function ContactPage() {
               <textarea
                 id="message"
                 name="message"
+                  required
                 rows={4}
                 placeholder="How can we help you?"
                 className="w-full resize-none border-b border-neutral-300 bg-transparent px-0 py-3 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-900"
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full bg-neutral-900 px-6 py-4 text-xs uppercase tracking-[0.2em] text-white transition hover:bg-neutral-700"
-            >
-              Send Message
-            </button>
+           <button
+  type="submit"
+  disabled={status === "loading"}
+  className="w-full bg-neutral-900 px-6 py-4 text-xs uppercase tracking-[0.2em] text-white transition hover:bg-neutral-700 disabled:opacity-60"
+>
+  {status === "loading" ? "Sending..." : "Send Message"}
+</button>
+{status === "success" && (
+  <p role="status" className="text-sm text-green-700">
+    Your message has been sent successfully.
+  </p>
+)}
+
+{status === "error" && (
+  <p role="alert" className="text-sm text-red-600">
+    Unable to send your message. Please try again.
+  </p>
+)}
           </form>
         </div>
       </section>

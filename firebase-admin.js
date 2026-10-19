@@ -8,7 +8,9 @@ const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
 if (!projectId || !clientEmail || !privateKey) {
-  throw new Error("Firebase Admin environment variables are missing.");
+  throw new Error(
+    "Firebase Admin environment variables are missing. Check your .env.local file."
+  );
 }
 
 const app =
@@ -22,6 +24,4 @@ const app =
         }),
       });
 
-const db = getFirestore(app);
-
-export { db };
+export const db = getFirestore(app);
