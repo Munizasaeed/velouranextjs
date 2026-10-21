@@ -388,13 +388,13 @@ export default function SignupPage() {
 
             <p className="mt-6 text-center text-xs leading-6 text-stone-400">
               By creating an account, you agree to our{" "}
-              <Link href="/terms" className="underline underline-offset-4">
+              <span href="/terms" className="underline underline-offset-4">
                 Terms
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className="underline underline-offset-4">
+              </span>
+              and
+              <span href="/privacy" className="underline underline-offset-4">
                 Privacy Policy
-              </Link>.
+              </span>.
             </p>
           </div>
         </section>
