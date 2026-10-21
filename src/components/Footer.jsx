@@ -10,7 +10,7 @@ const shopLinks = [
 const helpLinks = [
   { label: "Contact Us", href: "/contact" },
   { label: "About Veloura", href: "/about" },
-  { label: "FAQs", href: "/faq" },
+  { label: "FAQs", href: "/contact" },
 ];
 
 export default function Footer() {
@@ -75,7 +75,7 @@ export default function Footer() {
               VELOURA
             </Link>
 
-            <p className="mt-4 max-w-[220px] text-sm leading-6 text-[#817367]">
+            <p className="mt-4 max-w-55 text-sm leading-6 text-[#817367]">
               Your style, your story. Made for the everyday moments.
             </p>
           </div>
