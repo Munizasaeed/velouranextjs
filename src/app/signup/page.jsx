@@ -1,13 +1,141 @@
-
 "use client";
-
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-
 import { Eye, EyeOff, UserPlus } from "lucide-react";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { db, auth } from "../../../firebase";
+import { useRouter, usePathname } from "next/navigation";
+
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const formRef = useRef(null);
+  const redirectTimer = useRef(null);
+  const pathname = usePathname();
+
+  // Page jab bhi dobara dikhe (back button, Link, ya bfcache) to form reset karo
+  useEffect(() => {
+    const form = formRef.current;
+    function resetForm() {
+      setErrors({});
+      setMessage("");
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      setLoading(false);
+      form?.reset(); // inputs uncontrolled hain, reset() chalega
+    }
+    function handlePageShow(e) {
+      if (e.persisted) resetForm();
+    }
+
+    resetForm(); // route active hone par
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      resetForm(); // route hide/unmount hone par
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, [pathname]);
+
+  // Page chhodne par pending redirect timer cancel karo
+  useEffect(() => {
+    return () => {
+      if (redirectTimer.current) clearTimeout(redirectTimer.current);
+    };
+  }, []);
+
+  function handleChange(field) {
+    setErrors((prev) => ({ ...prev, [field]: "" }));
+    setMessage("");
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+
+    const form = e.currentTarget;
+    const name = form.elements.name.value.trim();
+    const email = form.elements.email.value.trim();
+    const password = form.elements.password.value;
+    const confirmPassword = form.elements.confirmPassword.value;
+
+    const newErrors = {};
+
+    if (!name) {
+      newErrors.name = "Full name is required.";
+    }
+
+    if (!email) {
+      newErrors.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = "Please enter a valid email address.";
+    }
+
+    if (!password) {
+      newErrors.password = "Password is required.";
+    } else if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters.";
+    }
+
+    if (!confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password.";
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match.";
+    }
+
+    setErrors(newErrors);
+    setMessage("");
+
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        name,
+        email: userCredential.user.email,
+        uid: userCredential.user.uid,
+        createdAt: new Date().toISOString(),
+      });
+      form.reset();
+      setErrors({});
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      setMessage("Account created successfully!");
+
+      redirectTimer.current = setTimeout(() => {
+        router.push("/");
+      }, 2000);
+    } catch (error) {
+      if (error.code === "auth/email-already-in-use") {
+        setErrors({
+          email: "This email is already registered.",
+        });
+      } else if (error.code === "auth/invalid-email") {
+        setErrors({
+          email: "Please enter a valid email address.",
+        });
+      } else if (error.code === "auth/weak-password") {
+        setErrors({
+          password: "Please choose a stronger password.",
+        });
+      } else {
+        setMessage("Something went wrong. Please try again.");
+        console.error("Signup error:", error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#f8f5f0] p-3 sm:p-5 lg:p-7">
@@ -72,19 +200,10 @@ export default function SignupPage() {
             </div>
 
             <form
+              ref={formRef}
               className="space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-
-                const form = e.currentTarget;
-                const password = form.elements.password.value;
-                const confirmPassword = form.elements.confirmPassword.value;
-
-                if (password !== confirmPassword) {
-                  alert("Passwords do not match.");
-                  return;
-                }
-              }}
+              noValidate
+              onSubmit={handleSubmit}
             >
               {/* Full Name */}
               <div>
@@ -101,9 +220,15 @@ export default function SignupPage() {
                   type="text"
                   placeholder="Enter your full name"
                   autoComplete="name"
-                  required
+                  onChange={() => handleChange("name")}
                   className="h-12 w-full rounded-lg border border-[#e7e0d8] bg-[#fdfcfb] px-4 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[#9a765b] focus:ring-2 focus:ring-[#9a765b]/10"
                 />
+
+                {errors.name && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.name}
+                  </p>
+                )}
               </div>
 
               {/* Email */}
@@ -121,9 +246,15 @@ export default function SignupPage() {
                   type="email"
                   placeholder="you@example.com"
                   autoComplete="email"
-                  required
+                  onChange={() => handleChange("email")}
                   className="h-12 w-full rounded-lg border border-[#e7e0d8] bg-[#fdfcfb] px-4 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[#9a765b] focus:ring-2 focus:ring-[#9a765b]/10"
                 />
+
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.email}
+                  </p>
+                )}
               </div>
 
               {/* Password */}
@@ -142,26 +273,29 @@ export default function SignupPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Create a password"
                     autoComplete="new-password"
-                    minLength={8}
-                    required
+                    onChange={() => handleChange("password")}
                     className="h-12 w-full rounded-lg border border-[#e7e0d8] bg-[#fdfcfb] px-4 pr-12 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[#9a765b] focus:ring-2 focus:ring-[#9a765b]/10"
                   />
 
-               
-<button
-  type="button"
-  aria-label={showPassword ? "Hide password" : "Show password"}
-  onClick={() => setShowPassword(!showPassword)}
-  className="absolute inset-y-0 right-3 flex items-center justify-center rounded p-2 text-stone-500 transition hover:text-[#382820]"
->
-  {showPassword ? (
-    <EyeOff size={20} strokeWidth={1.7} />
-  ) : (
-    <Eye size={20} strokeWidth={1.7} />
-  )}
-</button>
-
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-3 flex items-center justify-center rounded p-2 text-stone-500 transition hover:text-[#382820]"
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} strokeWidth={1.7} />
+                    ) : (
+                      <Eye size={20} strokeWidth={1.7} />
+                    )}
+                  </button>
                 </div>
+
+                {errors.password && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.password}
+                  </p>
+                )}
               </div>
 
               {/* Confirm Password */}
@@ -180,22 +314,59 @@ export default function SignupPage() {
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Re-enter your password"
                     autoComplete="new-password"
-                    minLength={8}
-                    required
+                    onChange={() => handleChange("confirmPassword")}
                     className="h-12 w-full rounded-lg border border-[#e7e0d8] bg-[#fdfcfb] px-4 pr-12 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[#9a765b] focus:ring-2 focus:ring-[#9a765b]/10"
                   />
 
-                 
+                  <button
+                    type="button"
+                    aria-label={
+                      showConfirmPassword
+                        ? "Hide confirm password"
+                        : "Show confirm password"
+                    }
+                    onClick={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }
+                    className="absolute inset-y-0 right-3 flex items-center justify-center rounded p-2 text-stone-500 transition hover:text-[#382820]"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={20} strokeWidth={1.7} />
+                    ) : (
+                      <Eye size={20} strokeWidth={1.7} />
+                    )}
+                  </button>
                 </div>
+
+                {errors.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.confirmPassword}
+                  </p>
+                )}
               </div>
+
+              {/* Success / General Message */}
+              {message && (
+                <p
+                  role="status"
+                  className={`text-center text-sm ${
+                    message === "Account created successfully!"
+                      ? "text-green-700"
+                      : "text-red-600"
+                  }`}
+                >
+                  {message}
+                </p>
+              )}
 
               {/* Create Account Button */}
               <button
                 type="submit"
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#382820] text-sm font-medium tracking-wide text-white transition duration-300 hover:bg-[#594133] focus:outline-none focus:ring-2 focus:ring-[#9a765b] focus:ring-offset-2"
+                disabled={loading}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#382820] text-sm font-medium tracking-wide text-white transition duration-300 hover:bg-[#594133] focus:outline-none focus:ring-2 focus:ring-[#9a765b] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Create account
-                  <UserPlus size={19} strokeWidth={1.8} />
+                {loading ? "Creating account..." : "Create account"}
+                {!loading && <UserPlus size={19} strokeWidth={1.8} />}
               </button>
             </form>
 

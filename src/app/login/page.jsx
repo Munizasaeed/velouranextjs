@@ -1,11 +1,159 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "../../../firebase";
 import { Eye, EyeOff, LogIn } from "lucide-react";
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState({});
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const redirectTimer = useRef(null);
+  const pathname = usePathname();
+
+  // Page jab bhi dobara dikhe (back button, Link, ya bfcache) to form reset karo
+  useEffect(() => {
+    function resetForm() {
+      setEmail("");
+      setPassword("");
+      setErrors({});
+      setMessage("");
+      setShowPassword(false);
+      setLoading(false);
+    }
+    function handlePageShow(e) {
+      if (e.persisted) resetForm();
+    }
+
+    resetForm(); // route active hone par
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      resetForm(); // route hide/unmount hone par
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, [pathname]);
+
+  // Page chhodne par pending redirect timer cancel karo
+  useEffect(() => {
+    return () => {
+      if (redirectTimer.current) clearTimeout(redirectTimer.current);
+    };
+  }, []);
+
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+    setErrors((prev) => ({ ...prev, email: "" }));
+    setMessage("");
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+    setErrors((prev) => ({ ...prev, password: "" }));
+    setMessage("");
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!email.trim()) {
+      newErrors.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrors.email = "Please enter a valid email address.";
+    }
+
+    if (!password) {
+      newErrors.password = "Password is required.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    if (!validateForm()) return;
+
+    setLoading(true);
+
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+
+      setEmail("");
+      setPassword("");
+      setErrors({});
+      setMessage("Login successful!");
+
+      // Change "/" if you want to redirect to another page.
+      redirectTimer.current = setTimeout(() => {
+        router.push("/");
+      }, 2000);
+    } catch (error) {
+      if (error.code === "auth/invalid-email") {
+        setErrors({ email: "Please enter a valid email address." });
+      } else if (
+        error.code === "auth/invalid-credential" ||
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/user-not-found"
+      ) {
+        setMessage("Incorrect email or password.");
+      } else if (error.code === "auth/too-many-requests") {
+        setMessage("Too many attempts. Please try again later.");
+      } else {
+        setMessage("Login failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setMessage("");
+
+    if (!email.trim()) {
+      setErrors((prev) => ({
+        ...prev,
+        email: "Enter your email address to reset your password.",
+      }));
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setErrors((prev) => ({
+        ...prev,
+        email: "Please enter a valid email address.",
+      }));
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setMessage("If an account exists for this email, a password reset email has been sent. Please check your inbox.");
+    } catch (error) {
+      if (error.code === "auth/invalid-email") {
+        setErrors((prev) => ({
+          ...prev,
+          email: "Please enter a valid email address.",
+        }));
+      } else if (error.code === "auth/too-many-requests") {
+        setMessage("Too many requests. Please try again later.");
+      } else {
+        setMessage("Unable to send the reset email. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f8f5f0] p-3 sm:p-5 lg:p-7">
@@ -64,15 +212,9 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <form
-              className="space-y-5"
-              onSubmit={(e) => e.preventDefault()}
-            >
+            <form className="space-y-5" onSubmit={handleLogin} noValidate>
               <div>
-                <label
-                  htmlFor="email"
-                  className="mb-2 block text-sm font-medium text-[#3e332c]"
-                >
+                <label htmlFor="email" className="mb-2 block text-sm font-medium text-[#3e332c]">
                   Email address
                 </label>
                 <input
@@ -81,25 +223,36 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@example.com"
                   autoComplete="email"
-                  required
-                  className="h-12 w-full rounded-lg border border-[#e7e0d8] bg-[#fdfcfb] px-4 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[#9a765b] focus:ring-2 focus:ring-[#9a765b]/10"
+                  value={email}
+                  onChange={handleEmailChange}
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? "email-error" : undefined}
+                  className={`h-12 w-full rounded-lg border bg-[#fdfcfb] px-4 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:ring-2 focus:ring-[#9a765b]/10 ${
+                    errors.email
+                      ? "border-red-500 focus:border-red-500"
+                      : "border-[#e7e0d8] focus:border-[#9a765b]"
+                  }`}
                 />
+                {errors.email && (
+                  <p id="email-error" className="mt-1.5 text-xs text-red-600">
+                    {errors.email}
+                  </p>
+                )}
               </div>
 
               <div>
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <label
-                    htmlFor="password"
-                    className="text-sm font-medium text-[#3e332c]"
-                  >
+                  <label htmlFor="password" className="text-sm font-medium text-[#3e332c]">
                     Password
                   </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs font-medium text-[#947052] transition hover:text-[#5b4030]"
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={loading}
+                    className="text-xs font-medium text-[#947052] transition hover:text-[#5b4030] disabled:opacity-50"
                   >
                     Forgot password?
-                  </Link>
+                  </button>
                 </div>
 
                 <div className="relative">
@@ -109,34 +262,58 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    required
-                    className="h-12 w-full rounded-lg border border-[#e7e0d8] bg-[#fdfcfb] px-4 pr-12 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[#9a765b] focus:ring-2 focus:ring-[#9a765b]/10"
+                    value={password}
+                    onChange={handlePasswordChange}
+                    aria-invalid={Boolean(errors.password)}
+                    aria-describedby={errors.password ? "password-error" : undefined}
+                    className={`h-12 w-full rounded-lg border bg-[#fdfcfb] px-4 pr-12 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:ring-2 focus:ring-[#9a765b]/10 ${
+                      errors.password
+                        ? "border-red-500 focus:border-red-500"
+                        : "border-[#e7e0d8] focus:border-[#9a765b]"
+                    }`}
                   />
-                  
-<button
-  type="button"
-  aria-label={showPassword ? "Hide password" : "Show password"}
-  onClick={() => setShowPassword(!showPassword)}
-  className="absolute inset-y-0 right-3 flex items-center justify-center rounded p-2 text-stone-500 transition hover:text-[#382820]"
->
-  {showPassword ? (
-    <EyeOff size={20} strokeWidth={1.7} />
-  ) : (
-    <Eye size={20} strokeWidth={1.7} />
-  )}
-</button>
-
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-3 flex items-center justify-center rounded p-2 text-stone-500 transition hover:text-[#382820]"
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} strokeWidth={1.7} />
+                    ) : (
+                      <Eye size={20} strokeWidth={1.7} />
+                    )}
+                  </button>
                 </div>
+                {errors.password && (
+                  <p id="password-error" className="mt-1.5 text-xs text-red-600">
+                    {errors.password}
+                  </p>
+                )}
               </div>
 
-            
-<button
-  type="submit"
-  className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#382820] text-sm font-medium tracking-wide text-white transition duration-300 hover:bg-[#594133] focus:outline-none focus:ring-2 focus:ring-[#9a765b] focus:ring-offset-2"
->
-  Sign in
-    <LogIn size={19} strokeWidth={1.8} />
-</button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#382820] text-sm font-medium tracking-wide text-white transition duration-300 hover:bg-[#594133] focus:outline-none focus:ring-2 focus:ring-[#9a765b] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loading ? "Please wait..." : "Sign in"}
+                {!loading && <LogIn size={19} strokeWidth={1.8} />}
+              </button>
+
+              {message && (
+                <p
+                  role="status"
+                  className={`text-center text-sm ${
+                    message.toLowerCase().includes("successful") ||
+                    message.toLowerCase().includes("reset email")
+                      ? "text-green-700"
+                      : "text-red-600"
+                  }`}
+                >
+                  {message}
+                </p>
+              )}
             </form>
 
             <div className="my-7 flex items-center gap-4">
@@ -161,10 +338,7 @@ export default function LoginPage() {
                 Terms
               </Link>{" "}
               and{" "}
-              <Link
-                href="/privacy"
-                className="underline underline-offset-4"
-              >
+              <Link href="/privacy" className="underline underline-offset-4">
                 Privacy Policy
               </Link>.
             </p>
